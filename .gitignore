@@ -2,3 +2,5 @@ vendor
 *.out
 .DS_STORE
 .env
+bin
+out

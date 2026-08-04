@@ -12,7 +12,9 @@ import (
 
 // Config contains the application's runtime configuration.
 type Config struct {
-	App AppConfig
+	App   AppConfig
+	DB    DBConfig
+	Redis RedisConfig
 }
 
 // AppConfig contains settings for the HTTP application.
@@ -20,6 +22,16 @@ type AppConfig struct {
 	Environment string `env:"APP_ENV" envDefault:"development"`
 	Host        string `env:"APP_HOST" envDefault:"0.0.0.0"`
 	Port        uint16 `env:"PORT" envDefault:"8080"`
+}
+
+// DBConfig contains database connection settings.
+type DBConfig struct {
+	DSN string `env:"DB_DSN,required,notEmpty"`
+}
+
+// RedisConfig contains Redis connection settings.
+type RedisConfig struct {
+	URL string `env:"REDIS_URL,required,notEmpty"`
 }
 
 // Load parses configuration from .env and the process environment.

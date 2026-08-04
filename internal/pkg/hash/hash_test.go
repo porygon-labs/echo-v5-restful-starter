@@ -2,11 +2,12 @@ package hash_test
 
 import (
 	"errors"
-	"go-restful-api/internal/constants"
-	"go-restful-api/internal/pkg/hash"
 	"math"
 	"slices"
 	"testing"
+
+	"go-restful-api/internal/constants"
+	"go-restful-api/internal/pkg/hash"
 
 	"github.com/sqids/sqids-go"
 )

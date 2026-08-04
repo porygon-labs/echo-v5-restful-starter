@@ -102,4 +102,23 @@ if [ "$CACHE" = true ]; then
   FEATURES="${FEATURES}, Redis cache"
 fi
 
+repo_ctor="${NAME}repo.New(deps.DB)"
+if [ "$CACHE" = true ]; then
+  repo_ctor="${NAME}repo.New(deps.DB, deps.Redis)"
+fi
+
 echo "Successfully generated Echo v5 module (${FEATURES}): ${DIR}"
+echo
+echo "  Don't forget to register the handler in internal/provider/modules.go:"
+echo
+echo "    import ("
+echo "        \"${MODULE_PATH}/internal/modules/${NAME}\""
+echo "        ${NAME}repo \"${MODULE_PATH}/internal/modules/${NAME}/repository\""
+echo "        ${NAME}svc \"${MODULE_PATH}/internal/modules/${NAME}/service\""
+echo "    )"
+echo
+echo "    // inside RegisterRoutes:"
+echo "    ${NAME}Repo := ${repo_ctor}"
+echo "    ${NAME}Svc := ${NAME}svc.New(${NAME}Repo)"
+echo "    ${NAME}Handler := ${NAME}.NewHandler(${NAME}Svc)"
+echo "    ${NAME}Handler.RegisterRoutes(v1.Group(\"/${NAME}\"))"

@@ -1,4 +1,11 @@
-.PHONY: module crud --crud
+.PHONY: module crud --crud fmt
+
+MODULE := $(shell awk '$$1 == "module" { print $$2; exit }' go.mod)
+
+# fmt sorts imports (std → internal → external) and formats all Go files.
+fmt:
+	gci write -s standard -s "prefix($(MODULE))" -s default --custom-order \
+		. 2>/dev/null; gofmt -w .
 
 # Usage:
 #   make module name=book

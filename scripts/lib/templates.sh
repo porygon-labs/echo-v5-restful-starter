@@ -691,6 +691,8 @@ import (
 
 	jsoniter "github.com/json-iterator/go"
 	"github.com/labstack/echo/v5"
+
+	"${MODULE_PATH}/internal/pkg/response"
 )
 
 var json = jsoniter.ConfigCompatibleWithStandardLibrary
@@ -718,91 +720,91 @@ func (h *Handler) RegisterRoutes(g *echo.Group) {
 
 // Create handles POST requests.
 func (h *Handler) Create(c *echo.Context) error {
-	var request Create${NAME_CAP}Request
-	if err := c.Bind(&request); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body").Wrap(err)
+	var req Create${NAME_CAP}Request
+	if err := c.Bind(&req); err != nil {
+		return response.Error(c, http.StatusBadRequest, "invalid request body")
 	}
 
-	response, err := h.service.Create(c.Request().Context(), request)
+	result, err := h.service.Create(c.Request().Context(), req)
 	if err != nil {
-		return ${NAME}HTTPError(err)
+		return toHTTPError(c, err)
 	}
 
-	return c.JSON(http.StatusCreated, response)
+	return response.Created(c, result)
 }
 
 // List handles GET collection requests.
 func (h *Handler) List(c *echo.Context) error {
-	response, err := h.service.List(c.Request().Context())
+	result, err := h.service.List(c.Request().Context())
 	if err != nil {
-		return ${NAME}HTTPError(err)
+		return toHTTPError(c, err)
 	}
 
-	return c.JSON(http.StatusOK, response)
+	return response.OK(c, result)
 }
 
 // GetByID handles GET item requests.
 func (h *Handler) GetByID(c *echo.Context) error {
-	id, err := parse${NAME_CAP}ID(c.Param("id"))
+	id, err := parseID(c.Param("id"))
 	if err != nil {
-		return err
+		return response.Error(c, http.StatusBadRequest, "invalid ${NAME} id")
 	}
 
-	response, err := h.service.GetByID(c.Request().Context(), id)
+	result, err := h.service.GetByID(c.Request().Context(), id)
 	if err != nil {
-		return ${NAME}HTTPError(err)
+		return toHTTPError(c, err)
 	}
 
-	return c.JSON(http.StatusOK, response)
+	return response.OK(c, result)
 }
 
 // Update handles PUT requests.
 func (h *Handler) Update(c *echo.Context) error {
-	id, err := parse${NAME_CAP}ID(c.Param("id"))
+	id, err := parseID(c.Param("id"))
 	if err != nil {
-		return err
+		return response.Error(c, http.StatusBadRequest, "invalid ${NAME} id")
 	}
 
-	var request Update${NAME_CAP}Request
-	if err := c.Bind(&request); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body").Wrap(err)
+	var req Update${NAME_CAP}Request
+	if err := c.Bind(&req); err != nil {
+		return response.Error(c, http.StatusBadRequest, "invalid request body")
 	}
 
-	response, err := h.service.Update(c.Request().Context(), id, request)
+	result, err := h.service.Update(c.Request().Context(), id, req)
 	if err != nil {
-		return ${NAME}HTTPError(err)
+		return toHTTPError(c, err)
 	}
 
-	return c.JSON(http.StatusOK, response)
+	return response.OK(c, result)
 }
 
 // Delete handles DELETE requests.
 func (h *Handler) Delete(c *echo.Context) error {
-	id, err := parse${NAME_CAP}ID(c.Param("id"))
+	id, err := parseID(c.Param("id"))
 	if err != nil {
-		return err
+		return response.Error(c, http.StatusBadRequest, "invalid ${NAME} id")
 	}
 
 	if err := h.service.Delete(c.Request().Context(), id); err != nil {
-		return ${NAME}HTTPError(err)
+		return toHTTPError(c, err)
 	}
 
-	return c.NoContent(http.StatusNoContent)
+	return response.NoContent(c)
 }
 
-func parse${NAME_CAP}ID(value string) (uint, error) {
+func parseID(value string) (uint, error) {
 	id, err := strconv.ParseUint(value, 10, strconv.IntSize)
 	if err != nil || id == 0 {
-		return 0, echo.NewHTTPError(http.StatusBadRequest, "invalid ${NAME} id")
+		return 0, err
 	}
 	return uint(id), nil
 }
 
-func ${NAME}HTTPError(err error) error {
+func toHTTPError(c *echo.Context, err error) error {
 	if errors.Is(err, ErrNotFound) {
-		return echo.NewHTTPError(http.StatusNotFound, ErrNotFound.Error()).Wrap(err)
+		return response.Error(c, http.StatusNotFound, err.Error())
 	}
-	return echo.NewHTTPError(http.StatusInternalServerError, "internal server error").Wrap(err)
+	return response.Error(c, http.StatusInternalServerError, "internal server error")
 }
 EOF
   else
@@ -813,6 +815,8 @@ package ${NAME}
 import (
 	jsoniter "github.com/json-iterator/go"
 	"github.com/labstack/echo/v5"
+
+	"${MODULE_PATH}/internal/pkg/response"
 )
 
 var json = jsoniter.ConfigCompatibleWithStandardLibrary
@@ -840,6 +844,8 @@ EOF
 }
 
 # ─── generate all ────────────────────────────────────────────────────────────
+# ─── generate all ────────────────────────────────────────────────────────────
+
 render_all() {
   render_model
   render_dto
@@ -861,5 +867,6 @@ render_all() {
   render_service_mapping
   render_handler
 
-  gofmt -w "$DIR"/*.go "$REPO_DIR"/*.go "$SVC_DIR"/*.go 2>/dev/null || true
+  gci write -s standard -s "prefix($MODULE_PATH)" -s default --custom-order \
+    "$DIR"/*.go "$REPO_DIR"/*.go "$SVC_DIR"/*.go 2>/dev/null || true
 }
