@@ -1,135 +1,105 @@
 #!/usr/bin/env sh
+set -eu
 
-set -e
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-NAME=$1
+usage() {
+  cat <<'EOF'
+Usage: ./scripts/create_module.sh <module_name> [--crud] [--with=cache]
+
+Options:
+  crud, --crud              Generate repository, service, and HTTP handler CRUD methods.
+  with=cache, --with=cache  Add a go-redis v9 cache-aside repository using generated keys.
+
+Boolean forms such as crud=true and crud=false are also supported.
+EOF
+}
+
+fail() {
+  echo "Error: $*" >&2
+  exit 1
+}
+
+# ─── parse arguments ─────────────────────────────────────────────────────────
+NAME=${1:-}
 
 if [ -z "$NAME" ]; then
-  echo "Error: Please specify module name."
-  echo "Usage: ./scripts/create_module.sh <module_name>"
+  usage >&2
   exit 1
 fi
+shift
+
+CRUD=false
+CACHE=false
+
+for OPTION in "$@"; do
+  case "$OPTION" in
+  crud | --crud | crud=true | --crud=true | crud=1 | --crud=1 | crud=yes | --crud=yes)
+    CRUD=true ;;
+  crud= | --crud= | crud=false | --crud=false | crud=0 | --crud=0 | crud=no | --crud=no)
+    CRUD=false ;;
+  with=cache | --with=cache)
+    CACHE=true ;;
+  with= | --with= | with=none | --with=none)
+    CACHE=false ;;
+  *)
+    fail "Unknown option '${OPTION}'. Expected '--crud' or '--with=cache'." ;;
+  esac
+done
+
+# ─── validate name ───────────────────────────────────────────────────────────
+if ! printf '%s\n' "$NAME" | grep -Eq '^[a-z][a-z0-9_]*$'; then
+  fail "Module name must be a lowercase Go identifier (for example: book or book_review)."
+fi
+
+case "$NAME" in
+break|default|func|interface|select|case|defer|go|map|struct|chan|else|goto|package|switch|const|fallthrough|if|range|type|continue|for|import|return|var)
+  fail "Module name '${NAME}' is a Go keyword." ;;
+esac
 
 DIR="internal/modules/${NAME}"
 
-# Safety Check: Stop if module directory already exists
 if [ -d "$DIR" ]; then
-  echo "Error: Module directory '${DIR}' already exists! Operation aborted."
-  exit 1
+  fail "Module directory '${DIR}' already exists! Operation aborted."
 fi
 
-# POSIX-compliant capitalization (e.g., "book" -> "Book")
-FIRST_CHAR=$(echo "$NAME" | cut -c1 | tr '[:lower:]' '[:upper:]')
-REST_CHARS=$(echo "$NAME" | cut -c2-)
-NAME_CAP="${FIRST_CHAR}${REST_CHARS}"
+if [ "$CACHE" = true ] && [ ! -f "internal/constants/cache.go" ]; then
+  fail "Cache constants are missing at internal/constants/cache.go."
+fi
 
+# ─── derive names ────────────────────────────────────────────────────────────
+NAME_CAP=$(printf '%s\n' "$NAME" | awk -F_ '{
+  for (i = 1; i <= NF; i++) {
+    printf "%s%s", toupper(substr($i, 1, 1)), substr($i, 2)
+  }
+  print ""
+}')
+
+MODULE_PATH=$(awk '$1 == "module" { print $2; exit }' go.mod 2>/dev/null || true)
+if [ -z "$MODULE_PATH" ]; then
+  fail "Could not read the module path from go.mod."
+fi
+
+REPO_DIR="${DIR}/repository"
+SVC_DIR="${DIR}/service"
+
+# ─── generate ────────────────────────────────────────────────────────────────
 mkdir -p "$DIR"
+trap 'rm -rf "$DIR"' 0 1 2 3 15
 
-# 1. model.go
-cat <<EOF >"$DIR/model.go"
-// Package ${NAME} defines database models and entities.
-package ${NAME}
+# shellcheck source=lib/templates.sh
+. "${SCRIPT_DIR}/lib/templates.sh"
+render_all
 
-import "gorm.io/gorm"
+trap - 0 1 2 3 15
 
-// ${NAME_CAP} represents the database entity for ${NAME}
-type ${NAME_CAP} struct {
-	gorm.Model
-	// TODO: Define custom GORM struct fields here
-}
-EOF
+# ─── report ──────────────────────────────────────────────────────────────────
+FEATURES="scaffolding"
+if [ "$CRUD" = true ]; then
+  FEATURES="${FEATURES}, CRUD"
+fi
+if [ "$CACHE" = true ]; then
+  FEATURES="${FEATURES}, Redis cache"
+fi
 
-# 2. dto.go
-cat <<EOF >"$DIR/dto.go"
-// Package ${NAME} defines Data Transfer Objects (DTOs) for incoming requests and outgoing responses.
-package ${NAME}
-
-// Create${NAME_CAP}Request defines the request payload for creating a ${NAME}
-type Create${NAME_CAP}Request struct {
-	// TODO: Define request payload fields with validation tags
-}
-
-// ${NAME_CAP}Response defines the response payload returned to the API client
-type ${NAME_CAP}Response struct {
-	// TODO: Define response payload fields
-}
-EOF
-
-# 3. repository.go
-cat <<EOF >"$DIR/repository.go"
-// Package ${NAME} handles database access and raw storage logic (DAO / Repository layer).
-package ${NAME}
-
-import (
-	"gorm.io/gorm"
-)
-
-// Repository defines data access operations for ${NAME}
-type Repository interface {
-	// TODO: Define repository methods (e.g., Create, FindByID, Update, Delete)
-}
-
-type repository struct {
-	db *gorm.DB
-}
-
-// NewRepository initializes a new ${NAME} Repository
-func NewRepository(db *gorm.DB) Repository {
-	return &repository{
-		db: db,
-	}
-}
-EOF
-
-# 4. service.go
-cat <<EOF >"$DIR/service.go"
-// Package ${NAME} contains core business logic, validations, and orchestration.
-package ${NAME}
-
-// Service defines business logic contracts for ${NAME}
-type Service interface {
-	// TODO: Define service layer methods
-}
-
-type service struct {
-	repo Repository
-}
-
-// NewService initializes a new ${NAME} Service
-func NewService(repo Repository) Service {
-	return &service{
-		repo: repo,
-	}
-}
-EOF
-
-# 5. handler.go
-cat <<EOF >"$DIR/handler.go"
-// Package ${NAME} handles HTTP routing, request parsing, and HTTP response delivery using Echo v5.
-package ${NAME}
-
-import (
-	"github.com/labstack/echo/v5"
-)
-
-// Handler manages HTTP endpoints for ${NAME}
-type Handler struct {
-	service Service
-}
-
-// NewHandler initializes a new ${NAME} HTTP Handler
-func NewHandler(service Service) *Handler {
-	return &Handler{
-		service: service,
-	}
-}
-
-// RegisterRoutes registers endpoints into an Echo router group
-func (h *Handler) RegisterRoutes(g *echo.Group) {
-	// TODO: Define routes
-	// Note: Extract context inside handlers for OpenTelemetry:
-	// ctx := c.Request().Context()
-}
-EOF
-
-echo "Successfully generated Echo v5 module scaffolding: ${DIR}"
+echo "Successfully generated Echo v5 module (${FEATURES}): ${DIR}"
