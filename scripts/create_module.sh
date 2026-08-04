@@ -12,7 +12,7 @@ fi
 
 DIR="internal/modules/${NAME}"
 
-# Safety Check: Stop if the folder already exists
+# Safety Check: Stop if module directory already exists
 if [ -d "$DIR" ]; then
   echo "Error: Module directory '${DIR}' already exists! Operation aborted."
   exit 1
@@ -30,9 +30,12 @@ cat <<EOF >"$DIR/model.go"
 // Package ${NAME} defines database models and entities.
 package ${NAME}
 
+import "gorm.io/gorm"
+
 // ${NAME_CAP} represents the database entity for ${NAME}
 type ${NAME_CAP} struct {
-	// TODO: Define GORM struct fields here
+	gorm.Model
+	// TODO: Define custom GORM struct fields here
 }
 EOF
 
@@ -123,7 +126,9 @@ func NewHandler(service Service) *Handler {
 
 // RegisterRoutes registers endpoints into an Echo router group
 func (h *Handler) RegisterRoutes(g *echo.Group) {
-	// TODO: Define routes (e.g., g.POST("", h.Create))
+	// TODO: Define routes
+	// Note: Extract context inside handlers for OpenTelemetry:
+	// ctx := c.Request().Context()
 }
 EOF
 
