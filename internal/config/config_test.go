@@ -181,9 +181,13 @@ func unsetEnv(t *testing.T, keys ...string) {
 	t.Cleanup(func() {
 		for key, val := range saved {
 			if val != nil {
-				os.Setenv(key, *val)
+				if err := os.Setenv(key, *val); err != nil {
+					t.Errorf("restore %s: %v", key, err)
+				}
 			} else {
-				os.Unsetenv(key)
+				if err := os.Unsetenv(key); err != nil {
+					t.Errorf("restore %s: %v", key, err)
+				}
 			}
 		}
 	})
