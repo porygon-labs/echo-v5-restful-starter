@@ -733,6 +733,7 @@ import (
 	jsoniter "github.com/json-iterator/go"
 	"github.com/labstack/echo/v5"
 
+	"${MODULE_PATH}/internal/pkg/logger"
 	"${MODULE_PATH}/internal/pkg/response"
 	"${MODULE_PATH}/internal/pkg/telemetry"
 )
@@ -861,6 +862,7 @@ func toHTTPError(c *echo.Context, err error) error {
 	if errors.Is(err, ErrNotFound) {
 		return response.Error(c, http.StatusNotFound, err.Error())
 	}
+	logger.Error("internal server error", "error", err, "path", c.Request().URL.Path)
 	return response.Error(c, http.StatusInternalServerError, "internal server error")
 }
 EOF

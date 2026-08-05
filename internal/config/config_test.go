@@ -143,6 +143,74 @@ func TestLoadPrefersProcessEnvironment(t *testing.T) {
 	}
 }
 
+func TestLoad_OtelDefaults(t *testing.T) {
+	setRequiredEnv(t)
+
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("Load() failed: %v", err)
+	}
+
+	if cfg.Otel.ExporterEndpoint != "localhost:4317" {
+		t.Errorf("Otel.ExporterEndpoint = %q, want %q", cfg.Otel.ExporterEndpoint, "localhost:4317")
+	}
+	if cfg.Otel.ServiceName != "go-restful-api" {
+		t.Errorf("Otel.ServiceName = %q, want %q", cfg.Otel.ServiceName, "go-restful-api")
+	}
+}
+
+func TestLoad_OtelCustom(t *testing.T) {
+	setRequiredEnv(t)
+	t.Setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "collector:4317")
+	t.Setenv("OTEL_SERVICE_NAME", "my-svc")
+
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("Load() failed: %v", err)
+	}
+
+	if cfg.Otel.ExporterEndpoint != "collector:4317" {
+		t.Errorf("Otel.ExporterEndpoint = %q, want %q", cfg.Otel.ExporterEndpoint, "collector:4317")
+	}
+	if cfg.Otel.ServiceName != "my-svc" {
+		t.Errorf("Otel.ServiceName = %q, want %q", cfg.Otel.ServiceName, "my-svc")
+	}
+}
+
+func TestLoad_LoggerDefaults(t *testing.T) {
+	setRequiredEnv(t)
+
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("Load() failed: %v", err)
+	}
+
+	if cfg.Logger.Level != "info" {
+		t.Errorf("Logger.Level = %q, want %q", cfg.Logger.Level, "info")
+	}
+	if cfg.Logger.Format != "json" {
+		t.Errorf("Logger.Format = %q, want %q", cfg.Logger.Format, "json")
+	}
+}
+
+func TestLoad_LoggerCustom(t *testing.T) {
+	setRequiredEnv(t)
+	t.Setenv("LOG_LEVEL", "debug")
+	t.Setenv("LOG_FORMAT", "text")
+
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("Load() failed: %v", err)
+	}
+
+	if cfg.Logger.Level != "debug" {
+		t.Errorf("Logger.Level = %q, want %q", cfg.Logger.Level, "debug")
+	}
+	if cfg.Logger.Format != "text" {
+		t.Errorf("Logger.Format = %q, want %q", cfg.Logger.Format, "text")
+	}
+}
+
 func TestLoad_UnreadableDotEnv(t *testing.T) {
 	t.Chdir(t.TempDir())
 	if err := os.Mkdir(".env", 0o700); err != nil {

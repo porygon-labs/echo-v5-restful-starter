@@ -12,10 +12,11 @@ import (
 
 // Config contains the application's runtime configuration.
 type Config struct {
-	App   AppConfig
-	DB    DBConfig
-	Redis RedisConfig
-	Otel  OtelConfig
+	App    AppConfig
+	DB     DBConfig
+	Redis  RedisConfig
+	Otel   OtelConfig
+	Logger LoggerConfig
 }
 
 // AppConfig contains settings for the HTTP application.
@@ -39,6 +40,12 @@ type RedisConfig struct {
 type OtelConfig struct {
 	ExporterEndpoint string `env:"OTEL_EXPORTER_OTLP_ENDPOINT" envDefault:"localhost:4317"`
 	ServiceName      string `env:"OTEL_SERVICE_NAME" envDefault:"go-restful-api"`
+}
+
+// LoggerConfig contains structured logging settings.
+type LoggerConfig struct {
+	Level  string `env:"LOG_LEVEL" envDefault:"info"`
+	Format string `env:"LOG_FORMAT" envDefault:"json"`
 }
 
 // Load parses configuration from .env and the process environment.

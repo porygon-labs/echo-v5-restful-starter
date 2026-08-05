@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"os/signal"
 	"strings"
@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"go-restful-api/internal/config"
+	"go-restful-api/internal/pkg/logger"
 	"go-restful-api/internal/pkg/telemetry"
 	"go-restful-api/internal/provider"
 
@@ -20,38 +21,69 @@ import (
 )
 
 func main() {
-	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer cancel()
-
+	// Must be the first thing: load config so we can set up the logger.
 	cfg, err := config.Load()
 	if err != nil {
-		log.Fatalf("Failed to load configuration: %v", err)
+		slog.Error("Failed to load configuration", "error", err)
+		os.Exit(1)
 	}
+
+	// Init the global structured logger.
+	logger.Init(logger.New(cfg.Logger.Level, cfg.Logger.Format))
+	log := logger.Default()
+
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
 
 	// Init OpenTelemetry.
 	shutdown, err := telemetry.Init(ctx, cfg.Otel.ServiceName, cfg.Otel.ExporterEndpoint)
 	if err != nil {
-		log.Fatalf("Failed to initialize telemetry: %v", err)
+		log.Error("Failed to initialize telemetry", "error", err)
+		os.Exit(1)
 	}
 	defer func() {
 		if err := shutdown(context.Background()); err != nil {
-			log.Printf("Failed to shutdown telemetry: %v", err)
+			log.Error("Failed to shutdown telemetry", "error", err)
 		}
 	}()
 
 	// Init shared dependencies (DB, Redis, …).
 	deps, err := provider.NewDeps(cfg)
 	if err != nil {
-		log.Fatalf("Failed to initialize dependencies: %v", err)
+		log.Error("Failed to initialize dependencies", "error", err)
+		os.Exit(1)
 	}
 	defer func() {
 		if err := deps.Close(); err != nil {
-			log.Printf("Failed to close dependencies: %v", err)
+			log.Error("Failed to close dependencies", "error", err)
 		}
 	}()
 
 	e := echo.New()
-	e.Use(middleware.RequestLogger())
+
+	// Echo request logger → slog.
+	e.Use(middleware.RequestLoggerWithConfig(middleware.RequestLoggerConfig{
+		LogMethod:    true,
+		LogURI:       true,
+		LogStatus:    true,
+		LogLatency:   true,
+		LogRemoteIP:  true,
+		LogHost:      true,
+		LogUserAgent: true,
+		LogValuesFunc: func(c *echo.Context, v middleware.RequestLoggerValues) error {
+			log.Info("request",
+				slog.String("method", v.Method),
+				slog.String("uri", v.URI),
+				slog.Int("status", v.Status),
+				slog.Duration("latency", v.Latency),
+				slog.String("remote_ip", v.RemoteIP),
+				slog.String("host", v.Host),
+				slog.String("user_agent", v.UserAgent),
+			)
+			return nil
+		},
+	}))
+
 	e.Use(middleware.Recover())
 	e.Use(echootel.NewMiddleware(cfg.Otel.ServiceName))
 
@@ -68,7 +100,8 @@ func main() {
 	}
 
 	if err := app.Start(ctx, e); err != nil {
-		log.Fatalf("Failed to start server: %v", err)
+		log.Error("server error", "error", err)
+		os.Exit(1)
 	}
 }
 
