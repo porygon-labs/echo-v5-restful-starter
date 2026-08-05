@@ -1,11 +1,68 @@
-.PHONY: module crud --crud fmt
+.PHONY: help build run dev test test-cover lint gosec fmt tidy clean up down module crud --crud
 
 MODULE := $(shell awk '$$1 == "module" { print $$2; exit }' go.mod)
+BIN   := ./tmp/main
 
-# fmt sorts imports (std → internal → external) and formats all Go files.
-fmt:
+# ─── help ────────────────────────────────────────────────────────────────────
+
+help: ## Show all targets
+	@awk -F ':|##' '/^[a-zA-Z0-9_\-]+:.*##/ { printf "  \033[36m%-16s\033[0m %s\n", $$1, $$NF }' $(MAKEFILE_LIST)
+
+# ─── build / run ─────────────────────────────────────────────────────────────
+
+build: ## Build the binary
+	go build -o $(BIN) ./cmd/api/main.go
+
+run: ## Start the server
+	go run ./cmd/api/main.go
+
+dev: ## Start with hot-reload (requires air)
+	air
+
+# ─── test ────────────────────────────────────────────────────────────────────
+
+test: ## Run unit tests
+	go test -v -race ./...
+
+test-cover: ## Run tests with coverage report
+	go test -v -race -coverprofile=coverage.out ./...
+	go tool cover -func=coverage.out
+	@echo "\n── open HTML report ──────────────────────────────────────────"
+	@echo "  go tool cover -html=coverage.out"
+
+# ─── lint / security ────────────────────────────────────────────────────────
+
+lint: ## Run golangci-lint
+	golangci-lint run ./...
+
+gosec: ## Run security scan
+	gosec ./...
+
+# ─── format ──────────────────────────────────────────────────────────────────
+
+fmt: ## Sort imports and format code
 	gci write -s standard -s "prefix($(MODULE))" -s default --custom-order \
 		. 2>/dev/null; gofmt -w .
+
+# ─── dependencies ────────────────────────────────────────────────────────────
+
+tidy: ## Tidy module dependencies
+	go mod tidy
+
+# ─── clean ───────────────────────────────────────────────────────────────────
+
+clean: ## Remove build artifacts
+	rm -rf $(BIN) tmp/ coverage.out
+
+# ─── infra ───────────────────────────────────────────────────────────────────
+
+up: ## Start dev dependencies (Postgres, Redis, Jaeger, Adminer)
+	docker compose up -d
+
+down: ## Stop dev dependencies
+	docker compose down
+
+# ─── generate ────────────────────────────────────────────────────────────────
 
 # Usage:
 #   make module name=book
@@ -13,7 +70,7 @@ fmt:
 #   make module name=book crud=true with=cache
 #   make module name=book -- --crud --with=cache
 # GNU Make requires `--` before custom long options.
-module:
+module: ## Scaffold a new module (e.g. make module name=book -- --crud)
  	# make module name=sample -- --with=cache --crud
 	@./scripts/create_module.sh "$(name)" \
 		"$(if $(filter crud --crud,$(MAKECMDGOALS)),crud,crud=$(crud))" \
