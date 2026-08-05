@@ -19,7 +19,7 @@ import (
 	"os"
 
 	"go-restful-api/internal/config"
-	"go-restful-api/internal/pkg/logger"
+	"github.com/porygon-labs/go-kit/logger"
 
 	"github.com/pressly/goose/v3"
 

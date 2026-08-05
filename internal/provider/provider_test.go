@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"go-restful-api/internal/config"
-	"go-restful-api/internal/pkg/response"
+	"github.com/porygon-labs/go-kit/response"
 	"go-restful-api/internal/provider"
 
 	"github.com/alicebob/miniredis/v2"

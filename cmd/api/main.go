@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"go-restful-api/internal/config"
-	"go-restful-api/internal/pkg/logger"
-	"go-restful-api/internal/pkg/telemetry"
+	"github.com/porygon-labs/go-kit/logger"
+	"github.com/porygon-labs/go-kit/telemetry"
 	"go-restful-api/internal/provider"
 
 	echootel "github.com/labstack/echo-opentelemetry"

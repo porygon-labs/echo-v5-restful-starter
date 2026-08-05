@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"time"
 
-	"go-restful-api/internal/pkg/response"
-	"go-restful-api/internal/pkg/telemetry"
+	"github.com/porygon-labs/go-kit/response"
+	"github.com/porygon-labs/go-kit/telemetry"
 
 	"github.com/labstack/echo/v5"
 )
@@ -15,7 +15,7 @@ import (
 func RegisterRoutes(e *echo.Echo, deps *Deps) {
 	// ─── 404 ─────────────────────────────────────────────────────────────
 	e.RouteNotFound("/*", func(c *echo.Context) error {
-		return response.Error(c, http.StatusNotFound, "Not Found")
+		return response.Error(c.Response(), http.StatusNotFound, "Not Found")
 	})
 
 	// ─── health ──────────────────────────────────────────────────────────
@@ -33,7 +33,7 @@ func healthz(c *echo.Context) error {
 	defer end()
 	_ = ctx
 
-	return response.OK(c, map[string]string{"status": "ok"})
+	return response.OK(c.Response(), map[string]string{"status": "ok"})
 }
 
 func readyz(c *echo.Context, d *Deps) error {
@@ -81,5 +81,5 @@ func readyz(c *echo.Context, d *Deps) error {
 	if failing {
 		status = http.StatusServiceUnavailable
 	}
-	return response.Success(c, status, checks)
+	return response.Success(c.Response(), status, checks)
 }
