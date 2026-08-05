@@ -8,8 +8,10 @@ import (
 	"go-restful-api/internal/config"
 
 	"github.com/redis/go-redis/v9"
+	"github.com/redis/go-redis/extra/redisotel/v9"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	"gorm.io/plugin/opentelemetry/tracing"
 )
 
 // Deps contains the shared dependencies used by the application modules.
@@ -37,9 +39,20 @@ func NewDeps(cfg config.Config) (*Deps, error) {
 		return nil, fmt.Errorf("database: connect: %w", err)
 	}
 
+	// Instrument GORM with OpenTelemetry tracing.
+	if err := db.Use(tracing.NewPlugin()); err != nil {
+		return nil, fmt.Errorf("database: instrument with OTEL: %w", err)
+	}
+
+	// Create and instrument Redis client.
+	rdb := redis.NewClient(redisOptions)
+	if err := redisotel.InstrumentTracing(rdb); err != nil {
+		return nil, fmt.Errorf("redis: instrument with OTEL: %w", err)
+	}
+
 	return &Deps{
 		DB:    db,
-		Redis: redis.NewClient(redisOptions),
+		Redis: rdb,
 	}, nil
 }
 

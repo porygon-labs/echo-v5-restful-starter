@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"go-restful-api/internal/pkg/response"
+	"go-restful-api/internal/pkg/telemetry"
 
 	"github.com/labstack/echo/v5"
 )
@@ -22,27 +23,33 @@ func RegisterRoutes(e *echo.Echo, deps *Deps) {
 	e.GET("/readyz", func(c *echo.Context) error { return readyz(c, deps) })
 
 	v1 := e.Group("/api/v1")
-	// TODO: remove this line and line below, and register your module here
 	_ = v1
 }
 
 // ─── health handlers ────────────────────────────────────────────────────────
 
 func healthz(c *echo.Context) error {
+	ctx, end := telemetry.StartSpan(c.Request().Context())
+	defer end()
+	_ = ctx
+
 	return response.OK(c, map[string]string{"status": "ok"})
 }
 
 func readyz(c *echo.Context, d *Deps) error {
+	ctx, end := telemetry.StartSpan(c.Request().Context())
+	defer end()
+
+	timedCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+
 	checks := map[string]string{}
 	failing := false
-
-	ctx, cancel := context.WithTimeout(c.Request().Context(), 2*time.Second)
-	defer cancel()
 
 	// db
 	if d != nil && d.DB != nil {
 		if sqlDB, err := d.DB.DB(); err == nil {
-			if err := sqlDB.PingContext(ctx); err != nil {
+			if err := sqlDB.PingContext(timedCtx); err != nil {
 				checks["db"] = err.Error()
 				failing = true
 			} else {
@@ -59,7 +66,7 @@ func readyz(c *echo.Context, d *Deps) error {
 
 	// redis
 	if d != nil && d.Redis != nil {
-		if err := d.Redis.Ping(ctx).Err(); err != nil {
+		if err := d.Redis.Ping(timedCtx).Err(); err != nil {
 			checks["redis"] = err.Error()
 			failing = true
 		} else {

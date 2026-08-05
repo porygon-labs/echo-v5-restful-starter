@@ -184,10 +184,14 @@ import (
 	"fmt"
 
 	"${MODULE_PATH}/internal/modules/${NAME}"
+	"${MODULE_PATH}/internal/pkg/telemetry"
 )
 
 // Create persists a new ${NAME}.
 func (r *repository) Create(ctx context.Context, entity *${NAME}.${NAME_CAP}) error {
+	ctx, end := telemetry.StartSpan(ctx)
+	defer end()
+
 	if err := r.db.WithContext(ctx).Create(entity).Error; err != nil {
 		return fmt.Errorf("create ${NAME}: %w", err)
 	}
@@ -215,10 +219,13 @@ import (
 	"fmt"
 
 	"${MODULE_PATH}/internal/modules/${NAME}"
+	"${MODULE_PATH}/internal/pkg/telemetry"
 )
 
 // FindAll returns all ${NAME} records.
 func (r *repository) FindAll(ctx context.Context) ([]${NAME}.${NAME_CAP}, error) {
+	ctx, end := telemetry.StartSpan(ctx)
+	defer end()
 EOF
   if [ "$CACHE" = true ]; then
     cat <<'EOF' >>"$REPO_DIR/find_all.go"
@@ -260,10 +267,13 @@ import (
 	"gorm.io/gorm"
 
 	"${MODULE_PATH}/internal/modules/${NAME}"
+	"${MODULE_PATH}/internal/pkg/telemetry"
 )
 
 // FindByID returns one ${NAME} by its primary key.
 func (r *repository) FindByID(ctx context.Context, id uint) (*${NAME}.${NAME_CAP}, error) {
+	ctx, end := telemetry.StartSpan(ctx)
+	defer end()
 EOF
   if [ "$CACHE" = true ]; then
     cat <<'EOF' >>"$REPO_DIR/find_by_id.go"
@@ -304,10 +314,14 @@ import (
 	"fmt"
 
 	"${MODULE_PATH}/internal/modules/${NAME}"
+	"${MODULE_PATH}/internal/pkg/telemetry"
 )
 
 // Update persists changes to an existing ${NAME}.
 func (r *repository) Update(ctx context.Context, entity *${NAME}.${NAME_CAP}) error {
+	ctx, end := telemetry.StartSpan(ctx)
+	defer end()
+
 	if err := r.db.WithContext(ctx).Save(entity).Error; err != nil {
 		return fmt.Errorf("update ${NAME}: %w", err)
 	}
@@ -335,10 +349,14 @@ import (
 	"fmt"
 
 	"${MODULE_PATH}/internal/modules/${NAME}"
+	"${MODULE_PATH}/internal/pkg/telemetry"
 )
 
 // Delete removes a ${NAME} by its primary key.
 func (r *repository) Delete(ctx context.Context, id uint) error {
+	ctx, end := telemetry.StartSpan(ctx)
+	defer end()
+
 	result := r.db.WithContext(ctx).Delete(&${NAME}.${NAME_CAP}{}, id)
 	if result.Error != nil {
 		return fmt.Errorf("delete ${NAME}: %w", result.Error)
@@ -539,10 +557,14 @@ import (
 	"context"
 
 	"${MODULE_PATH}/internal/modules/${NAME}"
+	"${MODULE_PATH}/internal/pkg/telemetry"
 )
 
 // Create creates a ${NAME}.
 func (s *service) Create(ctx context.Context, request ${NAME}.Create${NAME_CAP}Request) (${NAME}.${NAME_CAP}Response, error) {
+	ctx, end := telemetry.StartSpan(ctx)
+	defer end()
+
 	entity := new${NAME_CAP}(request)
 	if err := s.repo.Create(ctx, entity); err != nil {
 		return ${NAME}.${NAME_CAP}Response{}, err
@@ -568,10 +590,14 @@ import (
 	"context"
 
 	"${MODULE_PATH}/internal/modules/${NAME}"
+	"${MODULE_PATH}/internal/pkg/telemetry"
 )
 
 // List returns all ${NAME} records.
 func (s *service) List(ctx context.Context) ([]${NAME}.${NAME_CAP}Response, error) {
+	ctx, end := telemetry.StartSpan(ctx)
+	defer end()
+
 	entities, err := s.repo.FindAll(ctx)
 	if err != nil {
 		return nil, err
@@ -596,10 +622,14 @@ import (
 	"context"
 
 	"${MODULE_PATH}/internal/modules/${NAME}"
+	"${MODULE_PATH}/internal/pkg/telemetry"
 )
 
 // GetByID returns one ${NAME}.
 func (s *service) GetByID(ctx context.Context, id uint) (${NAME}.${NAME_CAP}Response, error) {
+	ctx, end := telemetry.StartSpan(ctx)
+	defer end()
+
 	entity, err := s.repo.FindByID(ctx, id)
 	if err != nil {
 		return ${NAME}.${NAME_CAP}Response{}, err
@@ -619,10 +649,14 @@ import (
 	"context"
 
 	"${MODULE_PATH}/internal/modules/${NAME}"
+	"${MODULE_PATH}/internal/pkg/telemetry"
 )
 
 // Update updates one ${NAME}.
 func (s *service) Update(ctx context.Context, id uint, request ${NAME}.Update${NAME_CAP}Request) (${NAME}.${NAME_CAP}Response, error) {
+	ctx, end := telemetry.StartSpan(ctx)
+	defer end()
+
 	entity, err := s.repo.FindByID(ctx, id)
 	if err != nil {
 		return ${NAME}.${NAME_CAP}Response{}, err
@@ -648,10 +682,17 @@ render_service_delete() {
   cat <<EOF >"$SVC_DIR/delete.go"
 package service
 
-import "context"
+import (
+	"context"
+
+	"${MODULE_PATH}/internal/pkg/telemetry"
+)
 
 // Delete deletes one ${NAME}.
 func (s *service) Delete(ctx context.Context, id uint) error {
+	ctx, end := telemetry.StartSpan(ctx)
+	defer end()
+
 	return s.repo.Delete(ctx, id)
 }
 EOF
@@ -693,6 +734,7 @@ import (
 	"github.com/labstack/echo/v5"
 
 	"${MODULE_PATH}/internal/pkg/response"
+	"${MODULE_PATH}/internal/pkg/telemetry"
 )
 
 var json = jsoniter.ConfigCompatibleWithStandardLibrary
@@ -720,12 +762,15 @@ func (h *Handler) RegisterRoutes(g *echo.Group) {
 
 // Create handles POST requests.
 func (h *Handler) Create(c *echo.Context) error {
+	ctx, end := telemetry.StartSpan(c.Request().Context())
+	defer end()
+
 	var req Create${NAME_CAP}Request
 	if err := c.Bind(&req); err != nil {
 		return response.Error(c, http.StatusBadRequest, "invalid request body")
 	}
 
-	result, err := h.service.Create(c.Request().Context(), req)
+	result, err := h.service.Create(ctx, req)
 	if err != nil {
 		return toHTTPError(c, err)
 	}
@@ -735,7 +780,10 @@ func (h *Handler) Create(c *echo.Context) error {
 
 // List handles GET collection requests.
 func (h *Handler) List(c *echo.Context) error {
-	result, err := h.service.List(c.Request().Context())
+	ctx, end := telemetry.StartSpan(c.Request().Context())
+	defer end()
+
+	result, err := h.service.List(ctx)
 	if err != nil {
 		return toHTTPError(c, err)
 	}
@@ -745,12 +793,15 @@ func (h *Handler) List(c *echo.Context) error {
 
 // GetByID handles GET item requests.
 func (h *Handler) GetByID(c *echo.Context) error {
+	ctx, end := telemetry.StartSpan(c.Request().Context())
+	defer end()
+
 	id, err := parseID(c.Param("id"))
 	if err != nil {
 		return response.Error(c, http.StatusBadRequest, "invalid ${NAME} id")
 	}
 
-	result, err := h.service.GetByID(c.Request().Context(), id)
+	result, err := h.service.GetByID(ctx, id)
 	if err != nil {
 		return toHTTPError(c, err)
 	}
@@ -760,6 +811,9 @@ func (h *Handler) GetByID(c *echo.Context) error {
 
 // Update handles PUT requests.
 func (h *Handler) Update(c *echo.Context) error {
+	ctx, end := telemetry.StartSpan(c.Request().Context())
+	defer end()
+
 	id, err := parseID(c.Param("id"))
 	if err != nil {
 		return response.Error(c, http.StatusBadRequest, "invalid ${NAME} id")
@@ -770,7 +824,7 @@ func (h *Handler) Update(c *echo.Context) error {
 		return response.Error(c, http.StatusBadRequest, "invalid request body")
 	}
 
-	result, err := h.service.Update(c.Request().Context(), id, req)
+	result, err := h.service.Update(ctx, id, req)
 	if err != nil {
 		return toHTTPError(c, err)
 	}
@@ -780,12 +834,15 @@ func (h *Handler) Update(c *echo.Context) error {
 
 // Delete handles DELETE requests.
 func (h *Handler) Delete(c *echo.Context) error {
+	ctx, end := telemetry.StartSpan(c.Request().Context())
+	defer end()
+
 	id, err := parseID(c.Param("id"))
 	if err != nil {
 		return response.Error(c, http.StatusBadRequest, "invalid ${NAME} id")
 	}
 
-	if err := h.service.Delete(c.Request().Context(), id); err != nil {
+	if err := h.service.Delete(ctx, id); err != nil {
 		return toHTTPError(c, err)
 	}
 

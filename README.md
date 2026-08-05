@@ -69,20 +69,43 @@ The server starts at `http://localhost:8080`.
 
 ### Environment Variables
 
-| Variable   | Default                              | Required | Description                          |
-| ---------- | ------------------------------------ | -------- | ------------------------------------ |
-| `APP_ENV`  | `development`                        | No       | Environment label (`development`, `production`) |
-| `APP_HOST` | `0.0.0.0`                            | No       | HTTP listen address                  |
-| `PORT`     | `8080`                               | No       | HTTP listen port                     |
-| `DB_DSN`   | —                                    | **Yes**  | PostgreSQL connection string         |
-| `REDIS_URL`| —                                    | **Yes**  | Redis connection URL                 |
+| Variable                      | Default               | Required | Description                          |
+| ----------------------------- | --------------------- | -------- | ------------------------------------ |
+| `APP_ENV`                     | `development`         | No       | Environment label (`development`, `production`) |
+| `APP_HOST`                    | `0.0.0.0`             | No       | HTTP listen address                  |
+| `PORT`                        | `8080`                | No       | HTTP listen port                     |
+| `DB_DSN`                      | —                     | **Yes**  | PostgreSQL connection string         |
+| `REDIS_URL`                   | —                     | **Yes**  | Redis connection URL                 |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | `localhost:4317`      | No       | OTLP gRPC collector endpoint         |
+| `OTEL_SERVICE_NAME`           | `go-restful-api`      | No       | Service name in traces               |
 
 ### Dev Tools
 
-| URL                    | Tool      |
-| ---------------------- | --------- |
+| URL                     | Tool                |
+| ----------------------- | ------------------- |
 | `http://localhost:9090` | Adminer (DB browser) |
 | `http://localhost:16686`| Jaeger (tracing UI)  |
+
+## Tracing
+
+Every HTTP request is automatically traced via the [Echo OpenTelemetry middleware](https://github.com/labstack/echo-opentelemetry). Traces are exported to Jaeger via OTLP gRPC on port `4317`.
+
+To create child spans inside your handlers and services, use the `telemetry.StartSpan` helper:
+
+```go
+import "go-restful-api/internal/pkg/telemetry"
+
+func (s *service) GetByID(ctx context.Context, id string) (*Book, error) {
+    ctx, end := telemetry.StartSpan(ctx)
+    defer end()
+
+    return s.repo.FindByID(ctx, id)
+}
+```
+
+`StartSpan` auto-names spans after the calling function (e.g. `book.(*service).GetByID`), so you don't need to pass span names manually.
+
+To view traces, open Jaeger at `http://localhost:16686`.
 
 ## API
 

@@ -11,8 +11,10 @@ import (
 	"time"
 
 	"go-restful-api/internal/config"
+	"go-restful-api/internal/pkg/telemetry"
 	"go-restful-api/internal/provider"
 
+	echootel "github.com/labstack/echo-opentelemetry"
 	"github.com/labstack/echo/v5"
 	"github.com/labstack/echo/v5/middleware"
 )
@@ -25,6 +27,17 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to load configuration: %v", err)
 	}
+
+	// Init OpenTelemetry.
+	shutdown, err := telemetry.Init(ctx, cfg.Otel.ServiceName, cfg.Otel.ExporterEndpoint)
+	if err != nil {
+		log.Fatalf("Failed to initialize telemetry: %v", err)
+	}
+	defer func() {
+		if err := shutdown(context.Background()); err != nil {
+			log.Printf("Failed to shutdown telemetry: %v", err)
+		}
+	}()
 
 	// Init shared dependencies (DB, Redis, …).
 	deps, err := provider.NewDeps(cfg)
@@ -40,6 +53,7 @@ func main() {
 	e := echo.New()
 	e.Use(middleware.RequestLogger())
 	e.Use(middleware.Recover())
+	e.Use(echootel.NewMiddleware(cfg.Otel.ServiceName))
 
 	// Wire and mount all module routes.
 	provider.RegisterRoutes(e, deps)

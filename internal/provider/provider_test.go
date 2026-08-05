@@ -266,3 +266,51 @@ func TestRegisterRoutes_NoPanic_WithNilDeps(t *testing.T) {
 	e := newEcho()
 	provider.RegisterRoutes(e, &provider.Deps{})
 }
+
+// ─── readyz edge cases ──────────────────────────────────────────────────────
+
+func TestReadyz_DBConnectionClosed(t *testing.T) {
+	e := newEcho()
+	db := newSQLiteDB(t)
+
+	// Close the underlying sql.DB so that db.DB() returns an error.
+	sqlDB, err := db.DB()
+	if err != nil {
+		t.Fatalf("DB(): %v", err)
+	}
+	if err := sqlDB.Close(); err != nil {
+		t.Fatalf("close sqlDB: %v", err)
+	}
+
+	deps := &provider.Deps{DB: db, Redis: newMiniRedis(t)}
+	provider.RegisterRoutes(e, deps)
+
+	rec := serve(t, e, http.MethodGet, "/readyz")
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Errorf("status = %d, want %d", rec.Code, http.StatusServiceUnavailable)
+	}
+}
+
+// ─── Close edge cases ───────────────────────────────────────────────────────
+
+func TestClose_BothDBAndRedis(t *testing.T) {
+	db := newSQLiteDB(t)
+	rdb := newMiniRedis(t)
+
+	deps := &provider.Deps{DB: db, Redis: rdb}
+	if err := deps.Close(); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+
+	// Verify both are closed.
+	if err := rdb.Ping(context.Background()).Err(); !errors.Is(err, redis.ErrClosed) {
+		t.Errorf("Redis not closed: %v", err)
+	}
+	sqlDB, err := db.DB()
+	if err != nil {
+		t.Fatalf("DB(): %v", err)
+	}
+	if err := sqlDB.Ping(); err == nil {
+		t.Error("DB still accepts connections after Close()")
+	}
+}
