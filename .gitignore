@@ -4,3 +4,5 @@ vendor
 .env
 bin
 out
+temp
+tmp
