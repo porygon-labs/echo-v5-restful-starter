@@ -80,8 +80,8 @@ func TestNew(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		l := logger.New(tt.level, tt.format)
 		var buf bytes.Buffer
+		var l *slog.Logger
 		if tt.format == "text" {
 			l = slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug}))
 		} else {

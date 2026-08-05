@@ -29,7 +29,7 @@ func captureStdout(fn func()) string {
 	}()
 
 	fn()
-	w.Close()
+	_ = w.Close()
 	os.Stdout = old
 
 	return <-done

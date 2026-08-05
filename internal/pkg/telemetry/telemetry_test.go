@@ -90,7 +90,7 @@ func TestInit_Success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("listen: %v", err)
 	}
-	defer ln.Close()
+	defer func() { _ = ln.Close() }()
 
 	shutdown, err := telemetry.Init(context.Background(), "test-svc", ln.Addr().String())
 	if err != nil {
