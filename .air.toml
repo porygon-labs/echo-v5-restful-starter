@@ -2,14 +2,14 @@
 
 root = "."
 testdata_dir = "testdata"
-tmp_dir = "tmp"
+tmp_dir = "bin"
 
 [build]
 args_bin = []
-bin = "./tmp/main"
-cmd = "go build -o ./tmp/main ./cmd/api/main.go"
+bin = "./bin/api"
+cmd = "go build -o ./bin/api ./cmd/api/main.go"
 delay = 1000
-exclude_dir = ["assets", "tmp", "vendor", "testdata"]
+exclude_dir = ["assets", "bin", "vendor", "testdata"]
 exclude_file = []
 exclude_regex = ["_test.go"]
 exclude_unchanged = false

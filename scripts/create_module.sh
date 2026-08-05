@@ -5,11 +5,13 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 usage() {
   cat <<'EOF'
-Usage: ./scripts/create_module.sh <module_name> [--crud] [--with=cache]
+Usage: ./scripts/create_module.sh <module_name> [--crud] [--with=cache|migrations]
 
 Options:
   crud, --crud              Generate repository, service, and HTTP handler CRUD methods.
   with=cache, --with=cache  Add a go-redis v9 cache-aside repository using generated keys.
+  with=migrations           Generate a goose migration SQL file for the module table.
+  with=redis,migrations     Combine multiple --with options (comma-separated).
 
 Boolean forms such as crud=true and crud=false are also supported.
 EOF
@@ -31,6 +33,7 @@ shift
 
 CRUD=false
 CACHE=false
+MIGRATIONS=false
 
 for OPTION in "$@"; do
   case "$OPTION" in
@@ -40,10 +43,29 @@ for OPTION in "$@"; do
     CRUD=false ;;
   with=cache | --with=cache)
     CACHE=true ;;
+  with=migrations | --with=migrations)
+    MIGRATIONS=true ;;
   with= | --with= | with=none | --with=none)
     CACHE=false ;;
   *)
-    fail "Unknown option '${OPTION}'. Expected '--crud' or '--with=cache'." ;;
+    # Allow comma-separated --with= values: --with=redis,migrations
+    _with_val="${OPTION#--with=}"
+    _with_val="${_with_val#with=}"
+    if [ "$_with_val" != "$OPTION" ]; then
+      _valid=false
+      IFS=','
+      for _part in $_with_val; do
+        case "$_part" in
+        cache | redis)  CACHE=true; _valid=true ;;
+        migrations)     MIGRATIONS=true; _valid=true ;;
+        esac
+      done
+      IFS=' '
+      if [ "$_valid" = true ]; then
+        continue
+      fi
+    fi
+    fail "Unknown option '${OPTION}'. Expected '--crud' or '--with=cache|migrations'." ;;
   esac
 done
 
@@ -100,6 +122,9 @@ if [ "$CRUD" = true ]; then
 fi
 if [ "$CACHE" = true ]; then
   FEATURES="${FEATURES}, Redis cache"
+fi
+if [ "$MIGRATIONS" = true ]; then
+  FEATURES="${FEATURES}, Migrations"
 fi
 
 repo_ctor="${NAME}repo.New(deps.DB)"

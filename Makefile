@@ -1,7 +1,7 @@
-.PHONY: help build run dev test test-cover lint gosec fmt tidy clean up down module crud --crud
+.PHONY: help build run dev test test-cover lint gosec fmt tidy clean up down migrate-up migrate-down migrate-status migrate-create migrate-redo module crud --crud
 
 MODULE := $(shell awk '$$1 == "module" { print $$2; exit }' go.mod)
-BIN   := ./tmp/main
+BIN   := ./bin/api
 
 # ─── help ────────────────────────────────────────────────────────────────────
 
@@ -52,7 +52,7 @@ tidy: ## Tidy module dependencies
 # ─── clean ───────────────────────────────────────────────────────────────────
 
 clean: ## Remove build artifacts
-	rm -rf $(BIN) tmp/ coverage.out
+	rm -rf $(BIN) bin/ coverage.out
 
 # ─── infra ───────────────────────────────────────────────────────────────────
 
@@ -62,6 +62,23 @@ up: ## Start dev dependencies (Postgres, Redis, Jaeger, Adminer)
 down: ## Stop dev dependencies
 	docker compose down
 
+# ─── migrations (goose) ─────────────────────────────────────────────────────
+
+migrate-up: ## Run all pending migrations
+	go run ./cmd/migrate/main.go up
+
+migrate-down: ## Roll back the most recent migration
+	go run ./cmd/migrate/main.go down
+
+migrate-status: ## Print migration status
+	go run ./cmd/migrate/main.go status
+
+migrate-create: ## Create a new migration (e.g. make migrate-create name=add_users)
+	go run ./cmd/migrate/main.go create $(name)
+
+migrate-redo: ## Redo the last migration (down → up)
+	go run ./cmd/migrate/main.go redo
+
 # ─── generate ────────────────────────────────────────────────────────────────
 
 # Usage:
@@ -69,9 +86,10 @@ down: ## Stop dev dependencies
 #   make module name=book crud with=cache
 #   make module name=book crud=true with=cache
 #   make module name=book -- --crud --with=cache
+#   make module name=book -- --crud --with=redis,migrations
 # GNU Make requires `--` before custom long options.
 module: ## Scaffold a new module (e.g. make module name=book -- --crud)
- 	# make module name=sample -- --with=cache --crud
+ 	# make module name=sample -- --with=cache,migrations --crud
 	@./scripts/create_module.sh "$(name)" \
 		"$(if $(filter crud --crud,$(MAKECMDGOALS)),crud,crud=$(crud))" \
 		"with=$(if $(with),$(with),$(--with))"

@@ -15,12 +15,15 @@ func TestCreateModule(t *testing.T) {
 		args      []string
 		wantCRUD  bool
 		wantCache bool
+		wantMigrations bool
 	}{
 		{name: "scaffold only", args: []string{"note"}},
 		{name: "CRUD only", args: []string{"article", "crud"}, wantCRUD: true},
 		{name: "cache only", args: []string{"cached", "with=cache"}, wantCache: true},
 		{name: "CRUD with cache", args: []string{"book_review", "crud", "with=cache"}, wantCRUD: true, wantCache: true},
 		{name: "long options", args: []string{"catalog", "--with=cache", "--crud"}, wantCRUD: true, wantCache: true},
+		{name: "migrations only", args: []string{"widget", "with=migrations"}, wantMigrations: true},
+		{name: "CRUD with cache and migrations", args: []string{"inventory", "crud", "with=redis,migrations"}, wantCRUD: true, wantCache: true, wantMigrations: true},
 	}
 
 	for _, tt := range tests {
@@ -57,6 +60,22 @@ func TestCreateModule(t *testing.T) {
 				assertContains(t, cache, `fmt.Sprintf("%s:`+moduleName+`:%d"`, true)
 			} else if !os.IsNotExist(err) {
 				t.Fatalf("repository/cache.go exists without with=cache (stat error: %v)", err)
+			}
+
+			// Migration file
+			migrationPattern := filepath.Join(root, "migrations", "*_create_"+moduleName+"_table.sql")
+			migrationFiles, _ := filepath.Glob(migrationPattern)
+			if tt.wantMigrations {
+				if len(migrationFiles) != 1 {
+					t.Fatalf("expected 1 migration file matching %s, got %d", migrationPattern, len(migrationFiles))
+				}
+				migration := readFile(t, migrationFiles[0])
+				assertContains(t, migration, "CREATE TABLE \""+moduleName+"\"", true)
+				assertContains(t, migration, "DROP TABLE IF EXISTS \""+moduleName+"\"", true)
+			} else {
+				if len(migrationFiles) != 0 {
+					t.Errorf("migration file found without with=migrations: %v", migrationFiles)
+				}
 			}
 		})
 	}
@@ -134,6 +153,9 @@ func newGeneratorFixture(t *testing.T) string {
 	}
 	if err := os.WriteFile(filepath.Join(root, "internal", "constants", "cache.go"), []byte("package constants\n"), 0o600); err != nil {
 		t.Fatalf("write cache constants: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Join(root, "migrations"), 0o755); err != nil {
+		t.Fatalf("create migrations directory: %v", err)
 	}
 	return root
 }

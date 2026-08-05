@@ -11,6 +11,7 @@
 #   $SVC_DIR     — $DIR/service
 #   $CRUD        — "true" or "false"
 #   $CACHE       — "true" or "false"
+#   $MIGRATIONS  — "true" or "false"
 # ─────────────────────────────────────────────────────────────────────────────
 
 # ─── model ───────────────────────────────────────────────────────────────────
@@ -902,7 +903,35 @@ EOF
   fi
 }
 
-# ─── generate all ────────────────────────────────────────────────────────────
+# ─── migration ───────────────────────────────────────────────────────────────
+
+render_migration() {
+  [ "$MIGRATIONS" != true ] && return
+
+  _ts=$(date -u +%Y%m%d%H%M%S 2>/dev/null || date +%Y%m%d%H%M%S)
+  _file="migrations/${_ts}_create_${NAME}_table.sql"
+
+  cat <<EOF >"$_file"
+-- +goose Up
+
+CREATE TABLE "${NAME}" (
+  "id"         BIGSERIAL    NOT NULL PRIMARY KEY,
+  "created_at" TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+  "updated_at" TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+  "deleted_at" TIMESTAMPTZ  NULL
+  -- TODO: add your fields here
+);
+
+CREATE INDEX "idx_${NAME}_deleted_at" ON "${NAME}" ("deleted_at");
+
+-- +goose Down
+
+DROP TABLE IF EXISTS "${NAME}";
+EOF
+
+  echo "  Migration: $_file"
+}
+
 # ─── generate all ────────────────────────────────────────────────────────────
 
 render_all() {
@@ -925,6 +954,7 @@ render_all() {
   render_service_delete
   render_service_mapping
   render_handler
+  render_migration
 
   gci write -s standard -s "prefix($MODULE_PATH)" -s default --custom-order \
     "$DIR"/*.go "$REPO_DIR"/*.go "$SVC_DIR"/*.go 2>/dev/null || true

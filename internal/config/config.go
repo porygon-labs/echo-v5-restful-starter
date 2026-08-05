@@ -28,7 +28,8 @@ type AppConfig struct {
 
 // DBConfig contains database connection settings.
 type DBConfig struct {
-	DSN string `env:"DB_DSN,required,notEmpty"`
+	Driver string `env:"DB_DRIVER" envDefault:"postgres"`
+	DSN    string `env:"DB_DSN,required,notEmpty"`
 }
 
 // RedisConfig contains Redis connection settings.
